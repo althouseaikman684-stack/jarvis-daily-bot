@@ -4,10 +4,7 @@ on:
   schedule:
     # 每天 UTC 时间 00:00 执行（对应北京时间早上 08:00）
     - cron: '0 0 * * *'
-  push:
-    branches:
-      - main
-  workflow_dispatch: # 支持在 GitHub 网页上手动点击一键运行
+  workflow_dispatch: # 支持在 GitHub 网页上随时手动点击测试
 
 jobs:
   daily-briefing:
