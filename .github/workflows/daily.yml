@@ -22,5 +22,6 @@ jobs:
         env:
           WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
           WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
+          VAULT_PAT: ${{ secrets.VAULT_PAT }}
         run: |
           python main.py
