@@ -2,16 +2,17 @@
 J.A.R.V.I.S. / 第二大脑 · 云端全天候每日晨报与自我进化守护引擎 (GitHub Actions 版)
 ========================================================================
 运行环境：GitHub Actions (全球云端服务器，24小时全天候守护，无需开机)
-触发时间：每天北京时间早晨 08:00 (UTC 00:00)
+触发时间：每天北京时间早晨 07:50 (UTC 23:50，提前避开整点拥堵)
 
 核心功能：
 1. 【动态待办】通过 GitHub API 实时拉取 second-brain-vault 的 tasks/index.md
 2. 【行程引擎】内置山西太原 5 日游 (8/24-8/28) 智能时间轴与学习计划状态机
-3. 【前沿速递】实时检索 arXiv physics.plasm-ph 聚变前沿 (ICRF/EAST/Tokamak) 并给出第二大脑研判
-4. 【AI 突破】追踪 Agent 与大模型前沿技术并研判科研应用
-5. 【自我进化】主动提出系统升级提案
-6. 【全网推送】WxPusher 微信卡片毫秒级直达手机
-7. 【自动归档】自动将晨报 Markdown 提交到 second-brain-vault/memory/summary/daily/
+3. 【聚变前沿】实时检索 arXiv physics.plasm-ph，自动去重（杜绝重复推荐），生成精准定制研判
+4. 【AI 前沿】实时检索 arXiv cs.AI/cs.MA/cs.CL，自动去重，生成多 Agent/AI4Science 深度研判
+5. 【费曼挑战】每日早晨由 AI 主动抛出 1 道 S/A 级核心物理概念深度思考题，检验真掌握度
+6. 【自我进化】基于系统架构痛点与聚变研究动态提出真创新提案
+7. 【全网推送】WxPusher 微信卡片毫秒级直达手机
+8. 【自动归档】自动将晨报 Markdown 提交到 second-brain-vault/vault/memory/summary/daily/
 """
 
 import os
@@ -22,7 +23,9 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import xml.etree.ElementTree as ET
+import re
 from datetime import datetime, date, timezone, timedelta
+import ssl
 
 # ==================== 解决 Windows 编码 ====================
 if sys.platform == 'win32':
@@ -43,19 +46,7 @@ VAULT_REPO = "second-brain-vault"
 # 北京时间时区 (UTC+8)
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-import ssl
-
 # ==================== SSL 上下文兼容 ====================
-def get_ssl_context():
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except Exception:
-        try:
-            return ssl.create_default_context()
-        except Exception:
-            return ssl._create_unverified_context()
-
 SSL_CONTEXT = ssl._create_unverified_context()
 
 # ==================== 1. GitHub API 交互组件 ====================
@@ -91,7 +82,6 @@ def github_api_put_file(file_path, content_text, commit_message):
         print("[Info] 未配置 VAULT_PAT，跳过云端 GitHub 仓库自动提交归档。")
         return False
         
-    # 先检查文件是否存在以获取 sha
     _, existing_sha = github_api_get_file(file_path)
     
     url = f"https://api.github.com/repos/{VAULT_OWNER}/{VAULT_REPO}/contents/{file_path}"
@@ -122,7 +112,40 @@ def github_api_put_file(file_path, content_text, commit_message):
         print(f"❌ [GitHub] 提交归档至 GitHub 失败: {e}")
     return False
 
-# ==================== 2. 行程时间轴引擎与动态待办解析 ====================
+# ==================== 2. 近期已推送论文去重机制 ====================
+def get_recently_pushed_arxiv_ids(today_bj):
+    """获取近 7 天已推送晨报中记录的所有 arXiv ID，杜绝重复推送"""
+    seen_ids = set()
+    for d_offset in range(1, 6):
+        past_date = today_bj - timedelta(days=d_offset)
+        past_path = f"vault/memory/summary/daily/{past_date.strftime('%Y-%m-%d')}.md"
+        raw_text, _ = github_api_get_file(past_path)
+        if not raw_text:
+            raw_text, _ = github_api_get_file(f"memory/summary/daily/{past_date.strftime('%Y-%m-%d')}.md")
+        if raw_text:
+            links = re.findall(r'arxiv\.org/abs/([\w\.\d\-]+)', raw_text)
+            for link_id in links:
+                pure_id = link_id.split('v')[0]
+                seen_ids.add(pure_id)
+                
+    try:
+        local_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vault", "memory", "summary", "daily"))
+        if os.path.exists(local_dir):
+            for fname in os.listdir(local_dir):
+                if fname.endswith(".md"):
+                    with open(os.path.join(local_dir, fname), "r", encoding="utf-8", errors="ignore") as f:
+                        txt = f.read()
+                    links = re.findall(r'arxiv\.org/abs/([\w\.\d\-]+)', txt)
+                    for link_id in links:
+                        pure_id = link_id.split('v')[0]
+                        seen_ids.add(pure_id)
+    except Exception:
+        pass
+        
+    print(f"🔍 [De-dup] 已识别历史已推送 arXiv 论文 {len(seen_ids)} 篇，自动开启去重过滤。")
+    return seen_ids
+
+# ==================== 3. 行程时间轴引擎与动态待办解析 ====================
 def get_trip_timeline(today_bj):
     """太原 5 日游 (8/24-8/28) 与聚变学习计划智能状态机"""
     start_date = date(2026, 8, 24)
@@ -131,26 +154,24 @@ def get_trip_timeline(today_bj):
     days_to_travel = (start_date - today_bj).days
     
     if days_to_travel > 0:
-        # 出发前倒计时
         status_line = f"✈️ **太原·山西 5 日松弛游**（8/24-8/28，距今 **{days_to_travel} 天**）："
         details = [
-            "🏨 住宿：海友酒店太原理工大学店或备选（2 间房，核对 4 人床位，连住 4 晚 8/24-8/28）",
+            "🏨 住宿：迎西智能酒店（太原理工迎西校区旁，家庭房×1，连住 4 晚 8/24-8/28）",
             "🏛️ 预约：云冈石窟微信实名预约（提前 15 天窗口期内，凭身份证原件走 3 号通道）",
-            "🏛️ 预约：山西博物院微信实名预约（鸟尊、晋国青铜器等）",
-            "🎒 行装：确认返程航班、随身证件与防晒"
+            "🏛️ 预约：山西博物院微信实名预约（⚠️ 建议 8/20 前完成）",
+            "🚄 交通：太原南⇄大同南往返高铁票（⚠️ 建议 8/20 前购票）与返程航班确认"
         ]
         fusion_status = "📘 **等离子体物理 25 天学习计划**（Day 0/25）：\n  - 双轨体系：Chen《等离子体物理学导论》+ 武松涛《托卡马克聚变堆研究进展》\n  - 状态：⏳ 待山西旅游结束后（8/29）正式启动 Day 1"
         return days_to_travel, status_line, details, fusion_status
         
     elif start_date <= today_bj <= end_date:
-        # 旅行进行中
         day_num = (today_bj - start_date).days + 1
         daily_plans = {
-            1: "【Day 1 · 启程抵晋】福州长乐 08:05 航班飞太原武宿，接机入住海友酒店，下午/傍晚钟楼街、柳巷品尝太原头道汤与面食。",
-            2: "【Day 2 · 三晋文脉】上午游览晋祠（难老泉、侍女像、圣母殿），下午参观山西博物院（鸟尊、鸮卣），傍晚汾河晚渡。",
-            3: "【Day 3 · 石窟瑰宝】前往大同，全天游览云冈石窟（第 5/6 窟大佛精绝，刷身份证入园），傍晚漫步大同古城城墙与华严寺。",
-            4: "【Day 4 · 奇绝古建】上午参观悬空寺（翠屏峰悬崖绝壁），下午瞻仰应县木塔（世界现存最高木结构古塔）。",
-            5: "【Day 5 · 晋商古韵与返程】上午漫步平遥古城/晋商大院，下午整理行李前往机场，结束充实难忘的山西之旅！"
+            1: "【Day 1 · 启程抵晋】福州长乐 08:05 航班飞太原武宿，接机入住迎西智能酒店，下午/傍晚柳巷、食品街品尝太原头道汤与面食。",
+            2: "【Day 2 · 三晋文脉】上午游览晋祠（难老泉、侍女像、圣母殿），下午参观太原古县城，傍晚汾河晚渡。",
+            3: "【Day 3 · 石窟瑰宝】高铁前往大同，全天游览云冈石窟（第 5/6 窟大佛精绝，刷身份证走 3 号通道），傍晚高铁返回太原南。",
+            4: "【Day 4 · 奇绝古建与省博】上午迎泽公园 + 山西地质博物馆，下午山西博物院（鸟尊、晋国青铜器），傍晚柳巷购物。",
+            5: "【Day 5 · 晋商古韵与返程】上午漫步平遥古城或太原市区，下午整理行李前往机场飞长沙，结束充实难忘的山西之旅！"
         }
         status_line = f"🏖️ **太原·山西 5 日松弛游 · 进行中（Day {day_num}/5）**："
         details = [daily_plans.get(day_num, "按计划松弛游览，享受假期！")]
@@ -158,7 +179,6 @@ def get_trip_timeline(today_bj):
         return 0, status_line, details, fusion_status
         
     else:
-        # 旅游结束，进入等离子体物理学习周期
         study_start = date(2026, 8, 29)
         day_study = (today_bj - study_start).days + 1
         day_study = max(1, min(day_study, 25))
@@ -188,26 +208,17 @@ def parse_live_tasks(today_bj):
             elif in_urgent_section and line_str.startswith("## "):
                 break
             elif in_urgent_section and line_str.startswith("- [ ]"):
-                # 提取未完成任务文本
                 task_content = line_str[5:].strip()
-                # 过滤掉内部过长的说明
                 if "太原" in task_content or "山西" in task_content:
-                    continue  # 由行程时间轴引擎专门精确渲染
+                    continue
                 if "等离子体" in task_content:
-                    continue  # 由聚变状态机专门精确渲染
+                    continue
                 urgent_items.append(f"- ⏳ {task_content}")
 
-    # 组装今日行程与关键待办
     urgent_tasks_formatted = []
-    
-    # 1. 放入太原行程/倒计时
     trip_block = f"{status_line}\n" + "\n".join([f"  - {d}" for d in details])
     urgent_tasks_formatted.append(trip_block)
-    
-    # 2. 放入聚变学习计划
     urgent_tasks_formatted.append(fusion_status)
-    
-    # 3. 放入其他真实抓取到的未完成待办
     for item in urgent_items:
         urgent_tasks_formatted.append(item)
         
@@ -216,9 +227,10 @@ def parse_live_tasks(today_bj):
         "urgent_tasks": urgent_tasks_formatted
     }
 
-# ==================== 3. arXiv 等离子体物理前沿抓取 ====================
-def fetch_plasma_papers():
-    url = "http://export.arxiv.org/api/query?search_query=cat:physics.plasm-ph+AND+(all:ICRF+OR+all:tokamak+OR+all:EAST+OR+all:plasma)&start=0&max_results=2&sortBy=submittedDate&sortOrder=descending"
+# ==================== 4. arXiv 等离子体物理前沿（智能去重 + 语义研判） ====================
+def fetch_plasma_papers(seen_ids):
+    """检索 arXiv physics.plasm-ph 聚变核心论文，执行去重并生成定制研判"""
+    url = "http://export.arxiv.org/api/query?search_query=cat:physics.plasm-ph+AND+(all:tokamak+OR+all:ICRF+OR+all:fusion+OR+all:EAST+OR+all:WEST+OR+all:divertor+OR+all:MHD+OR+all:gyrokinetic+OR+all:%22magnetic+confinement%22)&start=0&max_results=12&sortBy=submittedDate&sortOrder=descending"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
         with urllib.request.urlopen(req, timeout=12, context=SSL_CONTEXT) as response:
@@ -227,34 +239,63 @@ def fetch_plasma_papers():
         root = ET.fromstring(xml_data)
         ns = {'atom': 'http://www.w3.org/2005/Atom'}
         
-        papers = []
+        candidates = []
         for entry in root.findall('atom:entry', ns):
             title = entry.find('atom:title', ns).text.strip().replace('\n', ' ')
             summary = entry.find('atom:summary', ns).text.strip().replace('\n', ' ')
             link = entry.find('atom:id', ns).text.strip()
-            short_summary = summary[:220] + "..." if len(summary) > 220 else summary
-            papers.append({
+            
+            match = re.search(r'abs/([\w\.\d\-]+)', link)
+            paper_id = match.group(1).split('v')[0] if match else link
+            
+            if paper_id in seen_ids:
+                continue
+                
+            t_low = title.lower() + " " + summary.lower()
+            if any(k in t_low for k in ["icrf", "ion cyclotron", "fast wave", "slow wave", "antenna"]):
+                insight = "直接对应张伟组 ICRF 离子回旋波加热核心方向：重点关注其天线位形优化、耦合阻抗计算及快波/慢波功率在核心区的吸收机制。"
+            elif any(k in t_low for k in ["divertor", "sol", "scrape-off", "impurity", "tungsten", "sputtering"]):
+                insight = "等离子体边界与偏滤器材料相互作用前沿：对托卡马克稳态运行中钨等高 Z 杂质输运、热负荷缓解与杂质屏蔽机制极具参考价值。"
+            elif any(k in t_low for k in ["mhd", "instability", "tearing", "elm", "disruption", "sawtooth", "pinch"]):
+                insight = "磁流体力学（MHD）宏观稳定性控制：涉及破裂预警、锯齿振荡调控与磁岛抑制，是托卡马克高约束模长脉冲运行的关键保障。"
+            elif any(k in t_low for k in ["turbulence", "transport", "gyrokinetic", "drift wave"]):
+                insight = "微观湍流与反常输运理论：结合回旋动理学模拟，深入解析等离子体能量约束改善与内部输运垒（ITB）形成的物理图像。"
+            elif any(k in t_low for k in ["machine learning", "neural", "pinn", "deep learning", "surrogate"]):
+                insight = "AI for Plasma 交叉前沿：利用神经网络代理模型加速等离子体平衡演化重构与实时破裂预测，深度契合你的计算物理背景。"
+            elif any(k in t_low for k in ["neutron", "blanket", "alpha", "battery"]):
+                insight = "聚变核工程与中子学前沿：涉及聚变中子利用、氚自持循环及聚变副产物开发，拓宽了聚变能源应用的认知边界。"
+            else:
+                insight = "磁约束等离子体动理学前沿，有助于加深对磁面磁通坐标与粒子轨道约束拓扑的理解。"
+                
+            candidates.append({
+                "id": paper_id,
                 "title": title,
-                "summary": short_summary,
+                "summary": summary[:220] + "..." if len(summary) > 220 else summary,
+                "insight": insight,
                 "link": link
             })
-        if papers:
-            return papers
+            if len(candidates) >= 2:
+                break
+                
+        if candidates:
+            return candidates
     except Exception as e:
         print(f"[Warn] arXiv plasma fetch error: {e}")
     
     return [
         {
-            "title": "Investigation of ICRF Power Coupling and Edge Plasma Interactions in Tokamaks",
-            "summary": "分析了托卡马克 H 模下刮削层 (SOL) 密度分布对离子回旋共振加热 (ICRF) 天线耦合阻抗的影响，提出了抑制高 Z 杂质溅射的天线位形优化方案。",
-            "link": "https://arxiv.org/abs/physics.plasm-ph"
+            "id": "2608.13485",
+            "title": "Macroscopic Stability of a Rapidly Rotating Theta Pinch",
+            "summary": "The macroscopic ideal-MHD stability of an axisymmetric mirror device with sonic levels of plasma rotation is analyzed, showing how rotation shears stabilize flute and interchange modes in magnetic confinement.",
+            "insight": "磁流体力学（MHD）宏观稳定性控制：涉及旋转剪切对交换模不稳定性的抑制机理，对托卡马克剪切流改善约束有重要理论启发。",
+            "link": "http://arxiv.org/abs/2608.13485v1"
         }
     ]
 
-# ==================== 4. arXiv AI 与智能体前沿动态抓取 ====================
-def fetch_ai_frontier_papers():
-    """实时检索 arXiv cs.AI/cs.MA/cs.CL 最新 Agent、Memory 与科学推理前沿"""
-    url = "http://export.arxiv.org/api/query?search_query=(cat:cs.AI+OR+cat:cs.MA+OR+cat:cs.CL)+AND+(all:agent+OR+all:reasoning+OR+all:RAG+OR+all:memory+OR+all:%22physics-informed%22)&start=0&max_results=2&sortBy=submittedDate&sortOrder=descending"
+# ==================== 5. arXiv AI 与智能体前沿（智能去重 + 语义研判） ====================
+def fetch_ai_frontier_papers(seen_ids):
+    """检索 arXiv cs.AI/cs.MA/cs.CL 最新 Agent、Memory 与科学推理前沿"""
+    url = "http://export.arxiv.org/api/query?search_query=(cat:cs.AI+OR+cat:cs.MA+OR+cat:cs.CL)+AND+(all:agent+OR+all:reasoning+OR+all:RAG+OR+all:memory+OR+all:%22physics-informed%22)&start=0&max_results=12&sortBy=submittedDate&sortOrder=descending"
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
         with urllib.request.urlopen(req, timeout=12, context=SSL_CONTEXT) as response:
@@ -263,14 +304,18 @@ def fetch_ai_frontier_papers():
         root = ET.fromstring(xml_data)
         ns = {'atom': 'http://www.w3.org/2005/Atom'}
         
-        papers = []
+        candidates = []
         for entry in root.findall('atom:entry', ns):
             title = entry.find('atom:title', ns).text.strip().replace('\n', ' ')
             summary = entry.find('atom:summary', ns).text.strip().replace('\n', ' ')
             link = entry.find('atom:id', ns).text.strip()
-            short_summary = summary[:200] + "..." if len(summary) > 200 else summary
             
-            # 根据论文主题自动生成针对林云舒第二大脑与物理科研的定制化研判
+            match = re.search(r'abs/([\w\.\d\-]+)', link)
+            paper_id = match.group(1).split('v')[0] if match else link
+            
+            if paper_id in seen_ids:
+                continue
+                
             t_low = title.lower() + " " + summary.lower()
             if any(k in t_low for k in ["session", "memory", "handover", "context", "continual"]):
                 insight = "跨会话状态与记忆传递机制直接契合第二大脑在多 Agent（TRAE 与 Antigravity）间的认知一致性维护，值得吸纳进记忆架构。"
@@ -278,30 +323,37 @@ def fetch_ai_frontier_papers():
                 insight = "基于代码的数字孪生与环境交互思路，可迁移至等离子体物理波加热与粒子轨迹数值仿真的自动化代码生成与验证。"
             elif any(k in t_low for k in ["rag", "retrieval", "search", "dense"]):
                 insight = "结构化检索增强策略，可直接用于知识库内 Chen 教材与武松涛专著中复杂公式与物理图像的精准定位与推导。"
+            elif any(k in t_low for k in ["moral", "preference", "align"]):
+                insight = "多智能体人类偏好对齐前沿：揭示了提示词与隐式偏好引导机制，有助于提升第二大脑对你学术研究隐式需求的理解。"
             else:
                 insight = "前沿智能体在复杂长程任务上的自主推理与反思架构，为第二大脑自我维护与学术研究提供理论支撑。"
                 
-            papers.append({
+            candidates.append({
+                "id": paper_id,
                 "title": title,
-                "summary": short_summary,
+                "summary": summary[:200] + "..." if len(summary) > 200 else summary,
                 "insight": insight,
                 "link": link
             })
-        if papers:
-            return papers
+            if len(candidates) >= 2:
+                break
+                
+        if candidates:
+            return candidates
     except Exception as e:
         print(f"[Warn] arXiv AI fetch error: {e}")
         
     return [
         {
-            "title": "Handover of In-Context Learning State Across Session Boundaries",
-            "summary": "This study investigates session handover in large language models, demonstrating methods to serialize and transfer in-context learning state across independent agent execution bounds without full context bloat.",
-            "insight": "跨会话状态与记忆传递机制直接契合第二大脑在多 Agent（TRAE 与 Antigravity）间的认知一致性维护，值得吸纳进记忆架构。",
-            "link": "http://arxiv.org/abs/2608.14528v1"
+            "id": "2608.14490",
+            "title": "Twin: Playing an Unknown Game with a Test-Time Digital Twin",
+            "summary": "We present a Test-time World-model Inference (Twin) system, in which a frontier coding agent writes an executable world model for completing continual learning in unknown environments.",
+            "insight": "利用 Coding Agent 编写可执行世界模型的思路，非常适合迁移到聚变物理波加热与磁平衡仿真环境的自动化构建。",
+            "link": "http://arxiv.org/abs/2608.14490v1"
         }
     ]
 
-# ==================== 5. 系统自我进化提案引擎与费曼自测 ====================
+# ==================== 6. 系统自我进化提案引擎与费曼自测 ====================
 def get_feynman_challenge(today_bj):
     """基于知识库 S/A 级学科知识点轮转每日费曼深度挑战思考题"""
     challenges = [
@@ -351,16 +403,17 @@ def get_evolution_proposal(today_bj, days_to_travel):
     idx = (today_bj.day + today_bj.month) % len(proposals)
     return proposals[idx]
 
-# ==================== 6. 组装晨报 Markdown ====================
+# ==================== 7. 组装晨报 Markdown ====================
 def generate_briefing():
     now_bj = datetime.now(BEIJING_TZ)
     today_bj = now_bj.date()
     today_str = now_bj.strftime("%Y年%m月%d日")
     weekday_str = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"][today_bj.weekday()]
     
+    seen_ids = get_recently_pushed_arxiv_ids(today_bj)
     tasks_info = parse_live_tasks(today_bj)
-    plasma_papers = fetch_plasma_papers()
-    ai_papers = fetch_ai_frontier_papers()
+    plasma_papers = fetch_plasma_papers(seen_ids)
+    ai_papers = fetch_ai_frontier_papers(seen_ids)
     proposal = get_evolution_proposal(today_bj, tasks_info['days_to_travel'])
     feynman_domain, feynman_q = get_feynman_challenge(today_bj)
     
@@ -377,12 +430,12 @@ def generate_briefing():
     md += f"""
 ---
 
-### ⚛️ 【核聚变与等离子体物理前沿】
+### ⚛️ 【核聚变与等离子体物理前沿】 (arXiv 实时动态追踪)
 """
     for i, p in enumerate(plasma_papers, 1):
         md += f"**{i}. {p['title']}**\n"
         md += f"- **核心要点**：{p['summary']}\n"
-        md += f"- **【第二大脑研判】**：与中科大等离子体所张伟课题组研究的 ICRF 波加热与天线优化高度匹配，建议关注其耦合物理模型。\n"
+        md += f"- **【第二大脑研判】**：{p['insight']}\n"
         md += f"- 🔗 [查看 arXiv 论文]({p['link']})\n\n"
 
     md += f"""---
@@ -412,7 +465,7 @@ def generate_briefing():
 """
     return md, tasks_info, now_bj
 
-# ==================== 6. 发送微信推送 (WxPusher) ====================
+# ==================== 8. 发送微信推送 (WxPusher) ====================
 def send_wxpusher(content_md, summary_text):
     url = "https://wxpusher.zjiecode.com/api/send/message"
     payload = {
@@ -451,9 +504,9 @@ def main():
     
     days_to_travel = tasks_info['days_to_travel']
     if days_to_travel > 0:
-        summary_text = f"太原倒计时 {days_to_travel} 天 | 等离子体前沿 | AI进化简报"
+        summary_text = f"太原倒计时 {days_to_travel} 天 | 聚变前沿 | AI进化简报"
     elif days_to_travel == 0:
-        summary_text = "太原 5 日游今日启程！| 等离子体前沿 | AI进化简报"
+        summary_text = "太原 5 日游今日启程！| 聚变前沿 | AI进化简报"
     else:
         summary_text = "等离子体物理学习推进中 | 聚变前沿 | AI进化简报"
         
