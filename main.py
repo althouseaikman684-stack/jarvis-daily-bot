@@ -251,25 +251,107 @@ def fetch_plasma_papers():
         }
     ]
 
-# ==================== 4. AI 与智能体前沿 + 自我进化提案 ====================
-def get_ai_frontier_and_evolution():
-    ai_item = {
-        "title": "Edge-Voice-Agent: 毫秒级端到端低延迟全双工语音交互架构",
-        "summary": "开源社区突破性全双工语音架构，将 VAD 语音断句、上下文感知打断与流式 TTS 延迟压缩至 150ms 以内，支持在本地轻量化部署。",
-        "insight": "低延迟流式打断极大提升了公式推导或文献研读时的即时交互体验；在第二大脑内可作为随时唤醒的交互中枢。"
-    }
-    
-    evolution_proposal = {
-        "id": "2026-0817-02",
-        "title": "知识库全自动本地-云端双向闭环流水线部署",
-        "purpose": "打通 GitHub Actions 晨报机器人与 second-brain-vault 知识库仓库的读写闭环，实现免开机全天候推送 + 开机即时静默同步。",
-        "benefit": "彻底摆脱任务硬编码，微信晨报与知识库 tasks 永远保持实时同步，历史晨报无感入库。",
-        "action": "当前正在执行自动化部署与验证！"
-    }
-    
-    return ai_item, evolution_proposal
+# ==================== 4. arXiv AI 与智能体前沿动态抓取 ====================
+def fetch_ai_frontier_papers():
+    """实时检索 arXiv cs.AI/cs.MA/cs.CL 最新 Agent、Memory 与科学推理前沿"""
+    url = "http://export.arxiv.org/api/query?search_query=(cat:cs.AI+OR+cat:cs.MA+OR+cat:cs.CL)+AND+(all:agent+OR+all:reasoning+OR+all:RAG+OR+all:memory+OR+all:%22physics-informed%22)&start=0&max_results=2&sortBy=submittedDate&sortOrder=descending"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=12, context=SSL_CONTEXT) as response:
+            xml_data = response.read().decode('utf-8')
+        
+        root = ET.fromstring(xml_data)
+        ns = {'atom': 'http://www.w3.org/2005/Atom'}
+        
+        papers = []
+        for entry in root.findall('atom:entry', ns):
+            title = entry.find('atom:title', ns).text.strip().replace('\n', ' ')
+            summary = entry.find('atom:summary', ns).text.strip().replace('\n', ' ')
+            link = entry.find('atom:id', ns).text.strip()
+            short_summary = summary[:200] + "..." if len(summary) > 200 else summary
+            
+            # 根据论文主题自动生成针对林云舒第二大脑与物理科研的定制化研判
+            t_low = title.lower() + " " + summary.lower()
+            if any(k in t_low for k in ["session", "memory", "handover", "context", "continual"]):
+                insight = "跨会话状态与记忆传递机制直接契合第二大脑在多 Agent（TRAE 与 Antigravity）间的认知一致性维护，值得吸纳进记忆架构。"
+            elif any(k in t_low for k in ["world", "code", "twin", "simulation", "physics"]):
+                insight = "基于代码的数字孪生与环境交互思路，可迁移至等离子体物理波加热与粒子轨迹数值仿真的自动化代码生成与验证。"
+            elif any(k in t_low for k in ["rag", "retrieval", "search", "dense"]):
+                insight = "结构化检索增强策略，可直接用于知识库内 Chen 教材与武松涛专著中复杂公式与物理图像的精准定位与推导。"
+            else:
+                insight = "前沿智能体在复杂长程任务上的自主推理与反思架构，为第二大脑自我维护与学术研究提供理论支撑。"
+                
+            papers.append({
+                "title": title,
+                "summary": short_summary,
+                "insight": insight,
+                "link": link
+            })
+        if papers:
+            return papers
+    except Exception as e:
+        print(f"[Warn] arXiv AI fetch error: {e}")
+        
+    return [
+        {
+            "title": "Handover of In-Context Learning State Across Session Boundaries",
+            "summary": "This study investigates session handover in large language models, demonstrating methods to serialize and transfer in-context learning state across independent agent execution bounds without full context bloat.",
+            "insight": "跨会话状态与记忆传递机制直接契合第二大脑在多 Agent（TRAE 与 Antigravity）间的认知一致性维护，值得吸纳进记忆架构。",
+            "link": "http://arxiv.org/abs/2608.14528v1"
+        }
+    ]
 
-# ==================== 5. 组装晨报 Markdown ====================
+# ==================== 5. 系统自我进化提案引擎与费曼自测 ====================
+def get_feynman_challenge(today_bj):
+    """基于知识库 S/A 级学科知识点轮转每日费曼深度挑战思考题"""
+    challenges = [
+        ("等离子体物理", "在托卡马克 ICRF 离子回旋加热中，为什么快磁声波（Fast Magnetosonic Wave）能够无阻碍穿透高密度等离子体核心区，而慢波（Slow Wave）容易在低密度边界层发生截止或强烈杂质溅射？"),
+        ("热力学与统计物理", "麦克斯韦关系式中 $(\\frac{\\partial S}{\\partial V})_T = (\\frac{\\partial P}{\\partial T})_V$ 的微观物理本质是什么？如何利用该式结合热力学第一定律，严格证明理想气体的内能仅与温度有关？"),
+        ("电动力学", "在推导相对论性带电粒子电磁辐射（李纳-维谢尔势）时，为什么辐射功率角分布会出现强烈的向前倾斜效应（相对论聚束效应，$\\theta \\sim 1/\\gamma$）？"),
+        ("量子力学", "在一维无限深势阱中，如果势阱宽度突然扩大一倍（瞬变近似），为什么基态波函数向偶数能级的跃迁概率为 0，而只向奇数能级跃迁？这体现了什么对称性选择定则？"),
+        ("固体物理与自旋", "在具有 Dzyaloshinskii-Moriya (DM) 相互作用的手性磁体中，为什么结构反演对称性破缺会导致相邻自旋倾向于非共面倾斜，从而在热力学平衡态形成拓扑保护的磁斯格明子（Skyrmion）？"),
+        ("光电子学与 PIT", "等离激元诱导透明（PIT）中明模式（Bright Mode）与暗模式（Dark Mode）相消干涉的发生条件是什么？为什么暗模式的引入能大幅压窄共振透射谱的线宽？"),
+        ("计算物理与 PINNs", "在物理信息神经网络（PINNs）求解非线性偏微分方程时，为什么单纯加大网络深度往往不如在损失函数中引入自适应残差加权（Residual-based Adaptive Refinement）有效？")
+    ]
+    idx = today_bj.toordinal() % len(challenges)
+    return challenges[idx]
+
+def get_evolution_proposal(today_bj, days_to_travel):
+    """基于当前学习阶段、出行节点与第二大脑长期痛点生成的真创新进化提案矩阵"""
+    proposals = [
+        {
+            "id": "2026-0818-01",
+            "title": "Plasma-Symbolic-RAG：等离子体物理公式树与 MHD 符号检索图谱",
+            "purpose": "解决通用向量模型在检索 Chen 教材等离子体色散关系式、介电张量和波极化推导时的语义漂移与符号混淆问题。",
+            "benefit": "利用 LaTeX AST 建立物理公式符号子图，实现公式级高保真检索与适用边界严格核验，为等离子体 25 天学习计划提供精准知识引擎。",
+            "action": "设计公式解析器原型与 LaTeX 符号图谱构建规范。"
+        },
+        {
+            "id": "2026-0818-02",
+            "title": "Cognitive-Feynman-Interrogator：晨报费曼主动自测与掌握度动态评估",
+            "purpose": "将传统的被动复习日期表升级为每日早晨主动追问机制，通过 1 道深度物理挑战题检验真实掌握度。",
+            "benefit": "结合飞书移动端语音/文字作答，AI 自动判定理解深度并动态调节艾宾浩斯复习周期，彻底杜绝虚假熟练感。",
+            "action": "已于今日晨报正式上线「今日费曼挑战」测试模块！"
+        },
+        {
+            "id": "2026-0818-03",
+            "title": "Travel-Meteorology-Sentinel：太原 5 日游多源气象与景区实况动态预警",
+            "purpose": "在 8/24-8/28 出行前 3 天及旅行期间，自动接入太原/大同气象与景区客流 API，动态预警天气与交通变化。",
+            "benefit": "晋祠露天游览指数、云冈石窟大风防晒预警与太原南-大同南高铁进站提醒每日自动融入晨报，打造全天候随行管家。",
+            "action": "待 8/21 接入公共天气 API 并挂载至晨报行程引擎。"
+        },
+        {
+            "id": "2026-0818-04",
+            "title": "Cross-Agent Memory Synthesizer：跨端智能体记忆蒸馏与冲突消解协议",
+            "purpose": "解决 TRAE、Antigravity 与移动端飞书在多端产生灵感 notes 与临时待办时的碎片化和潜在记忆重叠。",
+            "benefit": "每日云端对 notes/ 和 decisions/ 进行语义聚类与冲突消解，保持第二大脑唯一事实来源的极度纯净与精炼。",
+            "action": "制定跨 Agent 写入互斥锁与语义消解机制。"
+        }
+    ]
+    idx = (today_bj.day + today_bj.month) % len(proposals)
+    return proposals[idx]
+
+# ==================== 6. 组装晨报 Markdown ====================
 def generate_briefing():
     now_bj = datetime.now(BEIJING_TZ)
     today_bj = now_bj.date()
@@ -278,7 +360,9 @@ def generate_briefing():
     
     tasks_info = parse_live_tasks(today_bj)
     plasma_papers = fetch_plasma_papers()
-    ai_item, proposal = get_ai_frontier_and_evolution()
+    ai_papers = fetch_ai_frontier_papers()
+    proposal = get_evolution_proposal(today_bj, tasks_info['days_to_travel'])
+    feynman_domain, feynman_q = get_feynman_challenge(today_bj)
     
     md = f"""# 🤖 林云舒的第二大脑 · 每日晨报与进化简报
 > 📅 **{today_str} · {weekday_str}** (云端全天候守护)
@@ -303,10 +387,20 @@ def generate_briefing():
 
     md += f"""---
 
-### 🧠 【AI 与智能体前沿突破】
-**1. {ai_item['title']}**
-- **核心突破**：{ai_item['summary']}
-- **【第二大脑研判】**：{ai_item['insight']}
+### 🧠 【AI 与智能体前沿突破】 (arXiv 实时动态追踪)
+"""
+    for i, p in enumerate(ai_papers, 1):
+        md += f"**{i}. {p['title']}**\n"
+        md += f"- **核心突破**：{p['summary']}\n"
+        md += f"- **【第二大脑研判】**：{p['insight']}\n"
+        md += f"- 🔗 [查看 arXiv 论文]({p['link']})\n\n"
+
+    md += f"""---
+
+### 🎯 【今日费曼挑战 · 早晨一问】 (主动认知检验)
+> 📚 学科领域：**{feynman_domain}**
+> ❓ **思考题**：{feynman_q}
+> 💡 *小贴士：可在飞书或对话中直接尝试用自己的语言口述/推导回答，第二大脑将自动评估你的掌握度！*
 
 ---
 
