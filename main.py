@@ -5,10 +5,10 @@ J.A.R.V.I.S. / 第二大脑 · 云端全天候每日晨报与自我进化守护�
 触发时间：每天北京时间早晨 07:50 (UTC 23:50，提前避开整点拥堵)
 
 核心功能：
-1. 【动态待办】通过 GitHub API 实时拉取 second-brain-vault 的 tasks/index.md
-2. 【行程引擎】内置山西太原 5 日游 (8/24-8/28) 智能时间轴与学习计划状态机
-3. 【聚变前沿】实时检索 arXiv physics.plasm-ph，自动去重（杜绝重复推荐），生成精准定制研判
-4. 【AI 前沿】实时检索 arXiv cs.AI/cs.MA/cs.CL，自动去重，生成多 Agent/AI4Science 深度研判
+1. 【动态待办】以 second-brain-vault 的 tasks/index.md 为唯一事实来源，实时展示当天待办
+2. 【行程引擎】内置太原游倒计时与状态机，旅游结束后自动淡出，无缝切换为后续重点
+3. 【聚变前沿】实时检索 arXiv physics.plasm-ph，7天去重记忆，生成针对性语义研判
+4. 【AI 前沿】实时检索 arXiv cs.AI/cs.MA/cs.CL，7天去重记忆，生成 Agent/AI4Science 研判
 5. 【费曼挑战】每日早晨由 AI 主动抛出 1 道 S/A 级核心物理概念深度思考题，检验真掌握度
 6. 【自我进化】基于系统架构痛点与聚变研究动态提出真创新提案
 7. 【全网推送】WxPusher 微信卡片毫秒级直达手机
@@ -145,60 +145,28 @@ def get_recently_pushed_arxiv_ids(today_bj):
     print(f"🔍 [De-dup] 已识别历史已推送 arXiv 论文 {len(seen_ids)} 篇，自动开启去重过滤。")
     return seen_ids
 
-# ==================== 3. 行程时间轴引擎与动态待办解析 ====================
-def get_trip_timeline(today_bj):
-    """太原 5 日游 (8/24-8/28) 与聚变学习计划智能状态机"""
-    start_date = date(2026, 8, 24)
-    end_date = date(2026, 8, 28)
-    
-    days_to_travel = (start_date - today_bj).days
-    
-    if days_to_travel > 0:
-        status_line = f"✈️ **太原·山西 5 日松弛游**（8/24-8/28，距今 **{days_to_travel} 天**）："
-        details = [
-            "🏨 住宿：迎西智能酒店（太原理工迎西校区旁，家庭房×1，连住 4 晚 8/24-8/28）",
-            "🏛️ 预约：云冈石窟微信实名预约（提前 15 天窗口期内，凭身份证原件走 3 号通道）",
-            "🏛️ 预约：山西博物院微信实名预约（⚠️ 建议 8/20 前完成）",
-            "🚄 交通：太原南⇄大同南往返高铁票（⚠️ 建议 8/20 前购票）与返程航班确认"
-        ]
-        fusion_status = "📘 **等离子体物理 25 天学习计划**（Day 0/25）：\n  - 双轨体系：Chen《等离子体物理学导论》+ 武松涛《托卡马克聚变堆研究进展》\n  - 状态：⏳ 待山西旅游结束后（8/29）正式启动 Day 1"
-        return days_to_travel, status_line, details, fusion_status
-        
-    elif start_date <= today_bj <= end_date:
-        day_num = (today_bj - start_date).days + 1
-        daily_plans = {
-            1: "【Day 1 · 启程抵晋】福州长乐 08:05 航班飞太原武宿，接机入住迎西智能酒店，下午/傍晚柳巷、食品街品尝太原头道汤与面食。",
-            2: "【Day 2 · 三晋文脉】上午游览晋祠（难老泉、侍女像、圣母殿），下午参观太原古县城，傍晚汾河晚渡。",
-            3: "【Day 3 · 石窟瑰宝】高铁前往大同，全天游览云冈石窟（第 5/6 窟大佛精绝，刷身份证走 3 号通道），傍晚高铁返回太原南。",
-            4: "【Day 4 · 奇绝古建与省博】上午迎泽公园 + 山西地质博物馆，下午山西博物院（鸟尊、晋国青铜器），傍晚柳巷购物。",
-            5: "【Day 5 · 晋商古韵与返程】上午漫步平遥古城或太原市区，下午整理行李前往机场飞长沙，结束充实难忘的山西之旅！"
-        }
-        status_line = f"🏖️ **太原·山西 5 日松弛游 · 进行中（Day {day_num}/5）**："
-        details = [daily_plans.get(day_num, "按计划松弛游览，享受假期！")]
-        fusion_status = "📘 **等离子体物理 25 天学习计划**：\n  - 状态：🏖️ 假期中，全身心放松蓄力，8/29 正式启动。"
-        return 0, status_line, details, fusion_status
-        
-    else:
-        study_start = date(2026, 8, 29)
-        day_study = (today_bj - study_start).days + 1
-        day_study = max(1, min(day_study, 25))
-        status_line = "✅ **太原·山西 5 日游已圆满收官！**"
-        details = ["回忆沉淀与精力重置完毕。"]
-        fusion_status = f"📘 **等离子体物理 25 天学习计划 · 正在推进（Day {day_study}/25）**：\n  - 理论轨：Chen 理论推导与物理图像建立\n  - 工程轨：武松涛托卡马克工程与 ICRF 加热技术\n  - 状态：🔥 正在高效推进中"
-        return -1, status_line, details, fusion_status
-
+# ==================== 3. 动态待办解析与自适应时间轴引擎 ====================
 def parse_live_tasks(today_bj):
-    """从 GitHub 知识库解析真实 tasks，并与行程引擎融合"""
-    days_to_travel, status_line, details, fusion_status = get_trip_timeline(today_bj)
-    
-    urgent_items = []
-    
-    # 尝试从 GitHub 知识库读取最新 tasks/index.md（优先兼容 vault/ 路径）
+    """
+    动态解析知识库 memory/tasks/index.md 的「🔴 今日/本周必须做」
+    并结合当前出行/学术阶段，智能渲染第一版面
+    """
     raw_tasks, _ = github_api_get_file("vault/memory/tasks/index.md")
     if not raw_tasks:
         raw_tasks, _ = github_api_get_file("memory/tasks/index.md")
+        
+    # 本地备用读取
+    if not raw_tasks:
+        try:
+            local_tasks_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "vault", "memory", "tasks", "index.md"))
+            if os.path.exists(local_tasks_path):
+                with open(local_tasks_path, "r", encoding="utf-8", errors="ignore") as f:
+                    raw_tasks = f.read()
+        except Exception:
+            pass
+
+    user_urgent_tasks = []
     if raw_tasks:
-        print("✅ [GitHub] 成功拉取最新 memory/tasks/index.md 待办清单")
         in_urgent_section = False
         for line in raw_tasks.splitlines():
             line_str = line.strip()
@@ -209,22 +177,67 @@ def parse_live_tasks(today_bj):
                 break
             elif in_urgent_section and line_str.startswith("- [ ]"):
                 task_content = line_str[5:].strip()
-                if "太原" in task_content or "山西" in task_content:
-                    continue
-                if "等离子体" in task_content:
-                    continue
-                urgent_items.append(f"- ⏳ {task_content}")
+                user_urgent_tasks.append(task_content)
 
-    urgent_tasks_formatted = []
-    trip_block = f"{status_line}\n" + "\n".join([f"  - {d}" for d in details])
-    urgent_tasks_formatted.append(trip_block)
-    urgent_tasks_formatted.append(fusion_status)
-    for item in urgent_items:
-        urgent_tasks_formatted.append(item)
+    # 太原时间轴与聚变状态机
+    start_travel = date(2026, 8, 24)
+    end_travel = date(2026, 8, 28)
+    days_to_travel = (start_travel - today_bj).days
+    
+    sections = []
+    
+    # 1. 如果在太原旅游之前 (today < 8/24)
+    if days_to_travel > 0:
+        travel_block = f"✈️ **太原·山西 5 日松弛游**（8/24-8/28，距今 **{days_to_travel} 天**）：\n" \
+                       f"  - 🏨 住宿：迎西智能酒店（太原理工迎西校区旁，家庭房×1，连住 4 晚 8/24-8/28）\n" \
+                       f"  - 🏛️ 预约：云冈石窟微信实名预约（提前 15 天窗口期内，凭身份证原件走 3 号通道）\n" \
+                       f"  - 🏛️ 预约：山西博物院微信实名预约（⚠️ 建议 8/20 前完成）\n" \
+                       f"  - 🚄 交通：太原南⇄大同南往返高铁票（⚠️ 建议 8/20 前购票）与返程航班确认"
+        sections.append(travel_block)
         
+        study_block = "📘 **等离子体物理 25 天学习计划**（Day 0/25）：\n" \
+                      "  - 双轨体系：Chen《等离子体物理学导论》+ 武松涛《托卡马克聚变堆研究进展》\n" \
+                      "  - 状态：⏳ 待山西旅游结束后（8/29）正式启动 Day 1"
+        sections.append(study_block)
+        
+    # 2. 如果在太原旅游期间 (8/24 <= today <= 8/28)
+    elif start_travel <= today_bj <= end_travel:
+        day_num = (today_bj - start_travel).days + 1
+        daily_plans = {
+            1: "【Day 1 · 启程抵晋】福州长乐 08:05 航班飞太原武宿，接机入住迎西智能酒店，下午/傍晚柳巷、食品街品尝太原头道汤与面食。",
+            2: "【Day 2 · 三晋文脉】上午游览晋祠（难老泉、侍女像、圣母殿），下午参观太原古县城，傍晚汾河晚渡。",
+            3: "【Day 3 · 石窟瑰宝】高铁前往大同，全天游览云冈石窟（第 5/6 窟大佛精绝，刷身份证走 3 号通道），傍晚高铁返回太原南。",
+            4: "【Day 4 · 奇绝古建与省博】上午迎泽公园 + 山西地质博物馆，下午山西博物院（鸟尊、晋国青铜器），傍晚柳巷购物。",
+            5: "【Day 5 · 晋商古韵与返程】上午漫步平遥古城或太原市区，下午整理行李前往机场飞长沙，结束充实难忘的山西之旅！"
+        }
+        travel_block = f"🏖️ **太原·山西 5 日松弛游 · 今日行程（Day {day_num}/5）**：\n" \
+                       f"  - 📍 {daily_plans.get(day_num, '按计划松弛游览，享受假期！')}"
+        sections.append(travel_block)
+        
+        study_block = "📘 **等离子体物理 25 天学习计划**：\n" \
+                      "  - 状态：🏖️ 假期中，全身心放松蓄力，8/29 正式启动。"
+        sections.append(study_block)
+        
+    # 3. 如果旅游已经结束 (8/29 之后)：太原旅行条目完全自动淡出！
+    else:
+        study_start = date(2026, 8, 29)
+        day_study = (today_bj - study_start).days + 1
+        day_study = max(1, min(day_study, 25))
+        study_block = f"📘 **等离子体物理 25 天学习计划 · 今日推进（Day {day_study}/25）**：\n" \
+                      f"  - 理论轨：Chen 理论推导与物理图像建立\n" \
+                      f"  - 工程轨：武松涛托卡马克工程与 ICRF 加热技术\n" \
+                      f"  - 状态：🔥 正在高效推进中"
+        sections.append(study_block)
+
+    # 4. 追加真实任务库中提取的任意其他待办事项（如驾校练车、选课、国赛等）
+    for t in user_urgent_tasks:
+        # 如果不是已被专门格式化渲染的特定条目，直接原汁原味展示
+        if not any(k in t for k in ["太原", "山西5日", "等离子体物理学习计划"]):
+            sections.append(f"📌 **待办事项**：{t}")
+
     return {
         "days_to_travel": days_to_travel,
-        "urgent_tasks": urgent_tasks_formatted
+        "urgent_tasks": sections
     }
 
 # ==================== 4. arXiv 等离子体物理前沿（智能去重 + 语义研判） ====================
@@ -422,7 +435,7 @@ def generate_briefing():
 
 ---
 
-### 📌 【今日行程与关键倒计时】
+### 📌 【今日行程与关键待办】
 """
     for t in tasks_info["urgent_tasks"]:
         md += f"- {t}\n"
