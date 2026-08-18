@@ -173,8 +173,10 @@ def parse_live_tasks(today_bj):
     
     urgent_items = []
     
-    # 尝试从 GitHub 知识库读取最新 tasks/index.md
-    raw_tasks, _ = github_api_get_file("memory/tasks/index.md")
+    # 尝试从 GitHub 知识库读取最新 tasks/index.md（优先兼容 vault/ 路径）
+    raw_tasks, _ = github_api_get_file("vault/memory/tasks/index.md")
+    if not raw_tasks:
+        raw_tasks, _ = github_api_get_file("memory/tasks/index.md")
     if raw_tasks:
         print("✅ [GitHub] 成功拉取最新 memory/tasks/index.md 待办清单")
         in_urgent_section = False
@@ -366,7 +368,7 @@ def main():
     push_success = send_wxpusher(content_md, summary_text)
     
     # 2. 云端 GitHub 知识库自动归档
-    archive_path = f"memory/summary/daily/{now_bj.strftime('%Y-%m-%d')}.md"
+    archive_path = f"vault/memory/summary/daily/{now_bj.strftime('%Y-%m-%d')}.md"
     commit_msg = f"🤖 Auto archive daily briefing for {now_bj.strftime('%Y-%m-%d')}"
     github_api_put_file(archive_path, content_md, commit_msg)
     

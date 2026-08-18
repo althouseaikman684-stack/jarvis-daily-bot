@@ -2,8 +2,8 @@ name: Second Brain Daily Morning Briefing
 
 on:
   schedule:
-    # 每天 UTC 时间 00:00 执行（对应北京时间早上 08:00）
-    - cron: '0 0 * * *'
+    # 每天 UTC 时间 23:50 执行（对应北京时间早上 07:50，提前避开整点排队拥堵，确保 8 点前准时送达）
+    - cron: '50 23 * * *'
   workflow_dispatch: # 支持在 GitHub 网页上随时手动点击测试
 
 jobs:
