@@ -421,46 +421,90 @@ def get_feynman_challenge(today_bj):
 
 def get_evolution_proposal(today_bj):
     """
-    动态解析知识库 gaps.md（真实未完成知识缺口）与 tasks/index.md（未完成科研/工程里程碑）
-    动态生成针对性前沿攻坚提案，绝不推送已完成项
+    双轨智能进化提案引擎 (Dual-Track Evolution Engine)：
+    - 轨道 A：【知识库体系纵深完善】基于 gaps.md 真实未完成缺口与科研主线，提出公理化推导与学科深度填充建议；
+    - 轨道 B：【前沿前瞻技术融入】结合最新 AI4Science、符号 RAG、智能体仿真与认知自省技术，提出使第二大脑更智能的架构方案。
+    - 每日按日期交替轮动，确保天天有新意、学术扎实与技术前沿兼备。
     """
-    raw_gaps, _ = read_vault_file("memory/knowledge/gaps.md")
+    is_tech_track = (today_bj.toordinal() % 2 == 1)
+    
+    if is_tech_track:
+        # 轨道 B：前沿技术智能融入第二大脑
+        tech_proposals = [
+            {
+                "id": f"TECH-{today_bj.strftime('%m%d')}-01",
+                "track": "前沿前瞻技术融入 · 符号物理 RAG",
+                "title": "Plasma-Symbolic-RAG：等离子体物理公式树与 LaTeX AST 符号检索引擎",
+                "purpose": "解决通用向量嵌入在检索等离子体波色散关系式、介电张量和回旋半径极化推导时的符号混淆与语义漂移。",
+                "benefit": "利用公式抽象语法树（AST）实现公式级高保真检索与物理适用边界核验，使第二大脑具备精准数理检索能力。",
+                "action": "设计 LaTeX AST 解析器原型，结合 Chen 教材波动推导建立符号图谱。"
+            },
+            {
+                "id": f"TECH-{today_bj.strftime('%m%d')}-02",
+                "track": "前沿前瞻技术融入 · AI4Science 智能体",
+                "title": "PINN-Kinetic-Agent：物理信息神经网络与 Vlasov 动理学代理求解工作流",
+                "purpose": "将前沿 PINNs 与神经算子（FNO/DeepONet）引入托卡马克高能粒子输运与 EMIC 波色散求解中。",
+                "benefit": "打通数据驱动与第一性原理物理先验，使第二大脑具备自动化生成物理仿真代码与验证色散根的能力。",
+                "action": "参考 BO-PBK 动力论框架，构建轻量 PINN 动理学验证沙盒。"
+            },
+            {
+                "id": f"TECH-{today_bj.strftime('%m%d')}-03",
+                "track": "前沿前瞻技术融入 · 跨会话认知蒸馏",
+                "title": "Cross-Session Memory Distiller：长程科研多轮对话状态无损压缩与图谱回写",
+                "purpose": "解决长时间深入推导复杂物理公式时长上下文衰减与跨 Agent（Antigravity/TRAE）记忆同步成本问题。",
+                "benefit": "每日自动对零散 notes/ 灵感进行概念聚类与隐式依赖挖掘，保持第二大脑唯一事实源的极度纯净与精炼。",
+                "action": "在本地部署增量记忆蒸馏管线，自动维护全库 85 资产拓扑图谱。"
+            },
+            {
+                "id": f"TECH-{today_bj.strftime('%m%d')}-04",
+                "track": "前沿前瞻技术融入 · 交互式多智能体沙盒",
+                "title": "Multi-Agent Theory Verifier：多智能体数理推导交叉审查与对偶反思机制",
+                "purpose": "在手推复杂规范场、辛几何与张量网络公式时，引入 Prover-Checker 双 Agent 对抗审查机制。",
+                "benefit": "自动捕获推导中的符号错漏、边界条件失效与量纲不自洽，大幅提升科研推导底稿的工业级严谨度。",
+                "action": "构建基于 Antigravity 的双 Agent 对偶推导审查指令集。"
+            }
+        ]
+        p_idx = (today_bj.toordinal() // 2) % len(tech_proposals)
+        return tech_proposals[p_idx]
 
-    active_gaps = []
-    if raw_gaps:
-        for line in raw_gaps.splitlines():
-            l = line.strip()
-            if l.startswith("|") and not any(k in l for k in ["缺口", "---", "级别", "标签"]):
-                parts = [p.strip() for p in l.split("|") if p.strip()]
-                if len(parts) >= 3:
-                    name = parts[0]
-                    # 剔除已完成项（带有 ~~ 或 🟢 覆盖）
-                    if "~~" not in name and "🟢" not in name:
-                        active_gaps.append({
-                            "title": name,
-                            "source": parts[1],
-                            "action": parts[2]
-                        })
+    else:
+        # 轨道 A：知识库体系纵深完善（动态从 gaps.md 抓取真实缺口）
+        raw_gaps, _ = read_vault_file("memory/knowledge/gaps.md")
+        active_gaps = []
+        if raw_gaps:
+            for line in raw_gaps.splitlines():
+                l = line.strip()
+                if l.startswith("|") and not any(k in l for k in ["缺口", "---", "级别", "标签"]):
+                    parts = [p.strip() for p in l.split("|") if p.strip()]
+                    if len(parts) >= 3:
+                        name = parts[0]
+                        if "~~" not in name and "🟢" not in name:
+                            active_gaps.append({
+                                "title": name,
+                                "source": parts[1],
+                                "action": parts[2]
+                            })
 
-    if active_gaps:
-        idx = (today_bj.toordinal() * 7 + 13) % len(active_gaps)
-        target_gap = active_gaps[idx]
+        if active_gaps:
+            g_idx = (today_bj.toordinal() * 7 + 13) % len(active_gaps)
+            target_gap = active_gaps[g_idx]
+            return {
+                "id": f"GAP-{today_bj.strftime('%m%d')}",
+                "track": "知识库体系纵深完善 · 学科缺口攻坚",
+                "title": f"【体系攻坚】{target_gap['title']} 深度公理化血肉填充",
+                "purpose": f"针对知识库尚未完全覆盖的学科缺口（触发来源：{target_gap['source']}），建立公理化推导与完整物理图像。",
+                "benefit": f"填补前沿学术储备，为中科大等离子体所 ICRF 聚变波加热与动力论科研筑牢数理基石。",
+                "action": f"建议获取与推进路径：{target_gap['action']}"
+            }
+
         return {
-            "id": f"GAP-{today_bj.strftime('%m%d')}",
-            "title": f"【前沿攻坚】{target_gap['title']} 深度血肉填充与数理建模",
-            "purpose": f"针对当前知识库缺口（来源：{target_gap['source']}），建立系统化公理推导与物理图像。",
-            "benefit": f"填补前沿学术储备，为中科大等离子体所研究生科研与 ICRF 聚变课题奠定坚实理论基础。",
-            "action": f"建议推进方案：{target_gap['action']}"
+            "id": f"ENG-{today_bj.strftime('%m%d')}",
+            "track": "知识库体系纵深完善 · 科研里程碑",
+            "title": "BO-PBK 动力论色散方程与 J-极点矩阵化闭环手推",
+            "purpose": "待等离子体物理基础夯实后，手推 Vlasov-Maxwell 动理学轨道积分与代数特征值闭环。",
+            "benefit": "打通磁约束聚变高能粒子不稳定性（EMIC/AE模）核心计算内核。",
+            "action": "待 8/29 等离子体计划启动后由 Antigravity 适时引导展开。"
         }
-
-    # 兜底通用进阶提案
-    return {
-        "id": f"ENG-{today_bj.strftime('%m%d')}",
-        "title": "BO-PBK 动力论色散方程与 J-极点矩阵化闭环手推",
-        "purpose": "待等离子体物理基础夯实后，手推 Vlasov-Maxwell 动理学轨道积分与代数特征值闭环。",
-        "benefit": "打通磁约束聚变高能粒子不稳定性（EMIC/AE模）核心计算内核。",
-        "action": "待 8/29 等离子体计划启动后由 Antigravity 适时引导展开。"
-    }
 
 # ==================== 6. 组装晨报 Markdown ====================
 def generate_briefing():
@@ -522,8 +566,9 @@ def generate_briefing():
 
 ---
 
-### 💡 【系统自我进化提案】 (动态映射真实缺口库)
+### 💡 【系统自我进化提案】 (⚡ 双轨轮动 · 体系完善与前沿技术融入)
 - 🚀 **提案 {proposal['id']}**：{proposal['title']}
+  - **提案类型**：🏷️ `{proposal.get('track', '自主演进')}`
   - **建议用途**：{proposal['purpose']}
   - **预期收益**：{proposal['benefit']}
   - **推进路径**：{proposal['action']}
