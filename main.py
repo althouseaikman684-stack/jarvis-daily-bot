@@ -252,40 +252,57 @@ def parse_live_tasks(today_bj):
     }
 
 # ==================== 4. arXiv 前沿文献检索（全量去重 + 智能语义研判） ====================
-def generate_ai_insight_with_llm(title, summary, category="plasma"):
-    """如果配置了大模型 Key，由大模型阅读 Abstract 进行真实研判"""
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+def generate_ai_insight_with_llm(title, summary, category="等离子体物理"):
+    """
+    调用大模型（优先 DeepSeek / 知识库凭据库）对论文 Abstract 进行 100% 真实、独一无二的针对性学术研判
+    """
+    api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raw_keys, _ = read_vault_file("memory/profile/api-keys.md")
+        if raw_keys:
+            m = re.search(r'sk-[a-zA-Z0-9]{20,}', raw_keys)
+            if m:
+                api_key = m.group(0)
+                
     if not api_key:
         return None
         
     try:
-        if os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY"):
-            base_url = "https://api.deepseek.com/v1/chat/completions" if os.environ.get("DEEPSEEK_API_KEY") else "https://api.openai.com/v1/chat/completions"
-            key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
-            model = "deepseek-chat" if os.environ.get("DEEPSEEK_API_KEY") else "gpt-4o-mini"
-            
-            prompt = f"请阅读以下学术论文标题与摘要，输出一段精炼客观的中文学术研判（约60-90字）。\n" \
-                     f"要求：第1句说明论文核心解决了什么科学/工程问题或提出了什么新方法；第2句客观说明其在{category}领域的理论或工程价值。\n" \
-                     f"杜绝同质化套话，紧扣文献真实内容。\n" \
-                     f"标题: {title}\n摘要: {summary}"
-                     
-            payload = {
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 150,
-                "temperature": 0.3
-            }
-            req = urllib.request.Request(
-                base_url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=10, context=SSL_CONTEXT) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                return data['choices'][0]['message']['content'].strip()
+        base_url = "https://api.deepseek.com/v1/chat/completions"
+        model = "deepseek-chat"
+        
+        prompt = f"请阅读以下学术论文标题与摘要，输出一段精炼、客观、针对该论文独一无二的中文学术研判（约60-85字）。\n" \
+                 f"要求：\n" \
+                 f"1. 必须紧扣该论文的具体研究对象与提出的独创方法，杜绝使用通用的抽象套话；\n" \
+                 f"2. 第1句指出论文具体解决了什么核心物理/计算痛点或提出了什么机制；\n" \
+                 f"3. 第2句客观说明其在【{category}】领域的理论或工程落地价值。\n\n" \
+                 f"论文标题: {title}\n" \
+                 f"论文摘要: {summary}"
+                 
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "你是一位精通等离子体物理、核聚变工程与 AI 科学计算的严谨学术同行评审员，擅长用最凝练的语言提炼文献本质。"},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 160,
+            "temperature": 0.3
+        }
+        req = urllib.request.Request(
+            base_url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=12, context=SSL_CONTEXT) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            insight = data['choices'][0]['message']['content'].strip()
+            if insight:
+                return insight
     except Exception as e:
-        print(f"[Warn] LLM API 研判生成跳过 ({e})，启用精细化规则引擎。")
+        print(f"[Warn] LLM API 研判生成跳过 ({e})")
+        
     return None
+
 
 def fetch_plasma_papers(seen_ids):
     """检索 arXiv physics.plasm-ph 聚变核心论文，严格去重并生成客观研判"""
