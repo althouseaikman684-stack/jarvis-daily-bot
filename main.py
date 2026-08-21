@@ -36,9 +36,9 @@ if sys.platform == 'win32':
         pass
 
 # ==================== 环境变量 / 密钥配置 ====================
-APP_TOKEN = os.environ.get("WXPUSHER_APP_TOKEN") or "AT_MERfNtorNArt4Alo9AkpUx1GRjpieamX"
-USER_UID = os.environ.get("WXPUSHER_UID") or "UID_HtpiaxeUlxUPMe6lwisMaavhlC0u"
-VAULT_PAT = os.environ.get("VAULT_PAT") or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or "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"
+APP_TOKEN = os.environ.get("WXPUSHER_APP_TOKEN", "")
+USER_UID = os.environ.get("WXPUSHER_UID", "")
+VAULT_PAT = os.environ.get("VAULT_PAT") or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN") or ""
 
 VAULT_OWNER = "althouseaikman684-stack"
 VAULT_REPO = "second-brain-vault"
