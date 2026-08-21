@@ -228,32 +228,36 @@ def parse_live_tasks(today_bj):
             elif in_urgent and l.startswith("- [ ]"):
                 task_content = l[5:].strip()
                 
+                # 剥离末尾的来源注脚，避免历史记录日期干扰目标日期判断
+                task_core = re.sub(r'—\s*来源:.*$', '', task_content).strip()
+                
                 # 排除类似 "Day 0/25", "Phase 1-5" 等非日期表达
-                task_for_matching = re.sub(r'Day\s*\d+/\d+', '', task_content)
+                task_for_matching = re.sub(r'Day\s*\d+/\d+', '', task_core)
                 task_for_matching = re.sub(r'Phase\s*\d+-\d+', '', task_for_matching)
                 
                 # 1. 优先匹配日期范围：例如 8/24-8/28 或 2026-08-24 至 2026-08-28
-                range_match = re.search(r'([1-9]|1[0-2])/([1-9]|[12]\d|3[01])\s*[-~至到]\s*([1-9]|1[0-2])/([1-9]|[12]\d|3[01])', task_for_matching)
-                single_match = re.search(r'(?:(?:20\d{2})[年\-\./])?([1-9]|1[0-2])[月\-\./]([1-9]|[12]\d|3[01])[日号]?', task_for_matching)
+                range_match = re.search(r'(1[0-2]|[1-9])/([12]\d|3[01]|[1-9])\s*[-~至到]\s*(1[0-2]|[1-9])/([12]\d|3[01]|[1-9])', task_for_matching)
+                single_match = re.search(r'(?:(?:20\d{2})[年\-\./])?(1[0-2]|[1-9])[月\-\./]([12]\d|3[01]|[1-9])[日号]?', task_for_matching)
                 
+                task_result = task_core
                 if range_match:
                     try:
                         start_m, start_d, end_m, end_d = map(int, range_match.groups())
                         d_start = date(current_year, start_m, start_d)
                         d_end = date(current_year, end_m, end_d)
                         
-                        task_content = re.sub(r'（[^）]*距今[^）]*）', '', task_content)
-                        task_content = re.sub(r'距今\s*[\d\*]+\s*天', '', task_content)
+                        task_result = re.sub(r'（[^）]*距今[^）]*）', '', task_result)
+                        task_result = re.sub(r'距今\s*[\d\*]+\s*天', '', task_result)
                         
                         if today_bj < d_start:
                             days_left = (d_start - today_bj).days
-                            task_content = f"{task_content} （⏳ 距开始还有 **{days_left} 天**）"
+                            task_result = f"{task_result} （⏳ 距开始还有 **{days_left} 天**）"
                         elif d_start <= today_bj <= d_end:
                             day_idx = (today_bj - d_start).days + 1
                             total_days = (d_end - d_start).days + 1
-                            task_content = f"{task_content} （🏖️ **进行中 · Day {day_idx}/{total_days}**）"
+                            task_result = f"{task_result} （🏖️ **进行中 · Day {day_idx}/{total_days}**）"
                         else:
-                            task_content = f"{task_content} （✅ 已顺利结束）"
+                            task_result = f"{task_result} （✅ 已顺利结束）"
                     except Exception:
                         pass
                         
@@ -263,19 +267,19 @@ def parse_live_tasks(today_bj):
                         d_target = date(current_year, s_m, s_d)
                         diff = (d_target - today_bj).days
                         
-                        task_content = re.sub(r'（[^）]*距今[^）]*）', '', task_content)
-                        task_content = re.sub(r'距今\s*[\d\*]+\s*天', '', task_content)
+                        task_result = re.sub(r'（[^）]*距今[^）]*）', '', task_result)
+                        task_result = re.sub(r'距今\s*[\d\*]+\s*天', '', task_result)
                         
                         if diff > 0:
-                            task_content = f"{task_content} （⏳ 距今 **{diff} 天**）"
+                            task_result = f"{task_result} （⏳ 距启动还有 **{diff} 天**）"
                         elif diff == 0:
-                            task_content = f"{task_content} （🚨 **今日截止/启动**）"
+                            task_result = f"{task_result} （🚨 **今日截止/启动**）"
                         else:
-                            task_content = f"{task_content} （⚠️ 进行中 / 已启动）"
+                            task_result = f"{task_result} （⚠️ 进行中 / 已启动）"
                     except Exception:
                         pass
                 
-                task_clean = task_content.replace("→ **Antigravity 执行**", "").strip()
+                task_clean = task_result.replace("→ **Antigravity 执行**", "").strip()
                 sections.append(task_clean)
                 if top_task_title == "日常学术科研推进":
                     top_task_title = task_clean[:25]
